@@ -7,7 +7,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Create table if not exists
+// Health endpoint (wakes server)
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
 db.exec(`CREATE TABLE IF NOT EXISTS scores (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   playerName TEXT NOT NULL,
@@ -17,14 +21,12 @@ db.exec(`CREATE TABLE IF NOT EXISTS scores (
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 )`);
 
-// Submit a solved game (server validates)
 app.post('/api/submit', (req, res) => {
   const { seed, difficulty, playerName, moves } = req.body;
   if (!seed || !difficulty || !playerName || !Array.isArray(moves)) {
     return res.status(400).json({ success: false, error: 'Missing fields' });
   }
 
-  // Regenerate puzzle with default colors
   const initialState = PL.generatePuzzle(seed, difficulty, PL.DEFAULT_COLORS);
   let state = PL.deepCopyTubes(initialState);
 
@@ -49,7 +51,6 @@ app.post('/api/submit', (req, res) => {
   res.json({ success: true, moveCount });
 });
 
-// Get leaderboard for a specific seed + difficulty
 app.get('/api/leaderboard', (req, res) => {
   const seed = req.query.seed;
   const difficulty = req.query.difficulty || 'medium';
@@ -57,7 +58,6 @@ app.get('/api/leaderboard', (req, res) => {
     return res.status(400).json({ error: 'Missing seed parameter' });
   }
 
-  // Get top 50
   const top = db.prepare(`
     SELECT playerName, moveCount, seed, difficulty, timestamp
     FROM scores
@@ -66,7 +66,6 @@ app.get('/api/leaderboard', (req, res) => {
     LIMIT 50
   `).all(seed, difficulty);
 
-  // Get total count for this seed+difficulty
   const total = db.prepare(`
     SELECT COUNT(*) as count FROM scores WHERE seed = ? AND difficulty = ?
   `).get(seed, difficulty).count;
